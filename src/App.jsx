@@ -174,8 +174,8 @@ function Home({ onHost, onJoin }) {
       <div style={styles.heroWrap}>
         <div style={styles.eyebrow}>QUIZ ROOM</div>
         <h1 style={styles.hero}>
-          選択式クイズを<br />
-          <span style={styles.heroAccent}>みんなで回答</span>
+          クリーンアップ・インターナショナル<br />
+          <span style={styles.heroAccent}>夕会クイズ</span>
         </h1>
         <p style={styles.heroSub}>ホストが進行、全員の画面が連動。</p>
       </div>
