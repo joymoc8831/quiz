@@ -5,12 +5,13 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDslW42ydu8c5IwUwSaAvNac-DtudfmvGE",
+  authDomain: "quiz-f8ee3.firebaseapp.com",
+  projectId: "quiz-f8ee3",
+  storageBucket: "quiz-f8ee3.firebasestorage.app",
+  messagingSenderId: "263683850540",
+  appId: "1:263683850540:web:ef919dfae0b1763c95ec89",
+  measurementId: "G-8ZZQXZN3D5"
 };
 
 const app = initializeApp(firebaseConfig);
