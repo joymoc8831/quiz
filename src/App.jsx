@@ -619,16 +619,16 @@ function ParticipantDone({ room, myAnswers, name, onExit }) {
           <Trophy size={32} strokeWidth={2.5} />
         </div>
         <h2 style={styles.doneTitle}>クイズ終了!</h2>
-        <p style={styles.doneSub}>{name} さん、お疲れさまでした</p>
+        <p style={styles.doneSub}>{name} チーム、お疲れさまでした</p>
         {scored && (
           <div style={styles.scoreCard}>
-            <div style={styles.scoreLabel}>あなたのスコア</div>
+            <div style={styles.scoreLabel}>チームのスコア</div>
             <div style={styles.scoreBig}>{score}<span style={styles.scoreTotal}> / {total}</span></div>
           </div>
         )}
       </div>
 
-      <div style={styles.sectionTitle}>あなたの回答</div>
+      <div style={styles.sectionTitle}>チームの回答</div>
       <div style={styles.myAnsList}>
         {room.questions.map((q, qi) => {
           const a = myAnswers[qi];
