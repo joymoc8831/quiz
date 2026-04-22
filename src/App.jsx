@@ -177,7 +177,7 @@ function Home({ onHost, onJoin }) {
           クリーンアップ・インターナショナル<br />
           <span style={styles.heroAccent}>夕会クイズ</span>
         </h1>
-        <p style={styles.heroSub}>ホストが進行、全員の画面が連動</p>
+        <p style={styles.heroSub}>代表者1名がご入力ください</p>
       </div>
       <div style={styles.bigBtns}>
         <button style={{ ...styles.bigBtn, ...styles.bigBtnPrimary }} onClick={onHost}>
