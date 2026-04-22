@@ -3,7 +3,7 @@ import { db } from './firebase.js';
 import { doc, setDoc, updateDoc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { Plus, Trash2, Copy, Check, ArrowLeft, Users, BarChart3, Play, Send, Clock, ChevronRight, X, Trophy } from 'lucide-react';
 
-const MARKS = ['①', '②', '③', '④'];
+const MARKS = ['A', 'B', 'C', 'D'];
 const MARK_COLORS = ['#e85d2f', '#2f7ae8', '#2fa368', '#c44ea8'];
 
 // ---------- Firestore helpers ----------
@@ -181,12 +181,12 @@ function Home({ onHost, onJoin }) {
       </div>
       <div style={styles.bigBtns}>
         <button style={{ ...styles.bigBtn, ...styles.bigBtnPrimary }} onClick={onHost}>
-          <span style={styles.bigBtnLabel}>ホストとして作成</span>
-          <span style={styles.bigBtnSub}>問題を作って進行する</span>
+          <span style={styles.bigBtnLabel}>出題者</span>
+          <span style={styles.bigBtnSub}>ホストとして作成</span>
         </button>
         <button style={{ ...styles.bigBtn, ...styles.bigBtnSecondary }} onClick={onJoin}>
-          <span style={styles.bigBtnLabel}>参加する</span>
-          <span style={styles.bigBtnSub}>ルームコードを入力</span>
+          <span style={styles.bigBtnLabel}>参加者</span>
+          <span style={styles.bigBtnSub}>ルームコードを入力して参加</span>
         </button>
       </div>
     </div>
@@ -311,7 +311,7 @@ function Join({ onBack, onJoin }) {
         />
       </div>
       <div style={styles.formBlock}>
-        <label style={styles.label}>あなたの名前</label>
+        <label style={styles.label}>チーム名</label>
         <input
           style={styles.textInput} placeholder="表示名" maxLength={20}
           value={name} onChange={(e) => setName(e.target.value)}
