@@ -169,15 +169,15 @@ function Home({ onHost, onJoin }) {
       <div style={styles.heroWrap}>
         <div style={styles.eyebrow}>QUIZ ROOM</div>
         <h1 style={styles.hero}>
-          選択式クイズを<br />
-          <span style={styles.heroAccent}>みんなで回答</span>
+          クリーンアップ・インターナショナル<br />
+          <span style={styles.heroAccent}>夕会クイズ</span>
         </h1>
-        <p style={styles.heroSub}>ホストが進行、全員の画面が連動。</p>
+        <p style={styles.heroSub}>チームで代表者１人がチームのアルファベットを入力</p>
       </div>
       <div style={styles.bigBtns}>
         <button style={{ ...styles.bigBtn, ...styles.bigBtnPrimary }} onClick={onHost}>
           <span style={styles.bigBtnLabel}>ホストとして作成</span>
-          <span style={styles.bigBtnSub}>問題を作って進行する</span>
+          <span style={styles.bigBtnSub}>夕会司会者用</span>
         </button>
         <button style={{ ...styles.bigBtn, ...styles.bigBtnSecondary }} onClick={onJoin}>
           <span style={styles.bigBtnLabel}>参加する</span>
