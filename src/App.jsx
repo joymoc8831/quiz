@@ -3,7 +3,7 @@ import { db } from './firebase.js';
 import { doc, setDoc, updateDoc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { Plus, Trash2, Copy, Check, ArrowLeft, Users, BarChart3, Play, Send, Clock, ChevronRight, X, Trophy } from 'lucide-react';
 
-const MARKS = ['A', 'B', 'C', 'D'];
+const MARKS = ['①', '②', '③', '④'];
 const MARK_COLORS = ['#e85d2f', '#2f7ae8', '#2fa368', '#c44ea8'];
 
 // ---------- Firestore helpers ----------
