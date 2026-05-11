@@ -1,18 +1,13 @@
 import { useState, useEffect } from 'react';
 import { db } from './firebase.js';
 import { doc, setDoc, updateDoc, getDoc, collection, onSnapshot } from 'firebase/firestore';
-import { Plus, Trash2, Copy, Check, ArrowLeft, Users, BarChart3, Play, Send, Clock, ChevronRight, X, Trophy } from 'lucide-react';
+import { Plus, Trash2, Copy, Check, ArrowLeft, Users, BarChart3, Play, Send, Clock, ChevronRight, X, Trophy, Eye } from 'lucide-react';
 
 const MARKS = ['①', '②', '③', '④'];
 const MARK_COLORS = ['#e85d2f', '#2f7ae8', '#2fa368', '#c44ea8'];
 
-// ---------- Firestore helpers ----------
-async function saveRoom(code, room) {
-  await setDoc(doc(db, 'rooms', code), room);
-}
-async function updateRoom(code, updates) {
-  await updateDoc(doc(db, 'rooms', code), updates);
-}
+async function saveRoom(code, room) { await setDoc(doc(db, 'rooms', code), room); }
+async function updateRoom(code, updates) { await updateDoc(doc(db, 'rooms', code), updates); }
 async function loadRoom(code) {
   const snap = await getDoc(doc(db, 'rooms', code));
   return snap.exists() ? snap.data() : null;
@@ -26,8 +21,8 @@ const genCode = () => {
   return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const qTime = (q) => q?.timeLimit ?? 20;
 
-// ---------- Main ----------
 export default function QuizApp() {
   const [role, setRole] = useState(null);
   const [view, setView] = useState('home');
@@ -45,7 +40,6 @@ export default function QuizApp() {
     return () => clearInterval(id);
   }, []);
 
-  // Subscribe to room (real-time)
   useEffect(() => {
     if (!code) { setRoom(null); return; }
     const unsub = onSnapshot(doc(db, 'rooms', code), (snap) => {
@@ -54,7 +48,6 @@ export default function QuizApp() {
     return () => unsub();
   }, [code]);
 
-  // Subscribe to participants (real-time)
   useEffect(() => {
     if (!code) { setParticipants([]); return; }
     const unsub = onSnapshot(collection(db, 'rooms', code, 'participants'), (snap) => {
@@ -73,8 +66,9 @@ export default function QuizApp() {
     if (!room || room.status !== 'active') return;
     const qIdx = room.currentQIdx;
     if (myAnswers[qIdx] !== undefined) return;
+    const q = room.questions[qIdx];
     const elapsed = (Date.now() - (room.questionStartedAt || 0)) / 1000;
-    if (elapsed > room.timeLimit) return;
+    if (elapsed > qTime(q)) return;
     const newAns = { ...myAnswers, [qIdx]: choice };
     setMyAnswers(newAns);
     await saveParticipant(code, myId, { id: myId, name: myName, answers: newAns, joinedAt: Date.now() });
@@ -87,11 +81,11 @@ export default function QuizApp() {
         {view === 'create' && (
           <CreateRoom
             onBack={() => setView('home')}
-            onCreate={async (questions, timeLimit) => {
+            onCreate={async (questions) => {
               const c = genCode();
               const r = {
-                code: c, questions, timeLimit,
-                status: 'waiting', currentQIdx: -1, questionStartedAt: null,
+                code: c, questions,
+                status: 'waiting', currentQIdx: -1, questionStartedAt: null, revealed: false,
                 createdAt: Date.now()
               };
               await saveRoom(c, r);
@@ -124,19 +118,20 @@ export default function QuizApp() {
       {role === 'host' && room.status === 'waiting' && (
         <HostWaiting
           code={code} room={room} participants={participants}
-          onStart={() => updateRoom(code, { status: 'active', currentQIdx: 0, questionStartedAt: Date.now() })}
+          onStart={() => updateRoom(code, { status: 'active', currentQIdx: 0, questionStartedAt: Date.now(), revealed: false })}
           onExit={exit} toast={showToast}
         />
       )}
       {role === 'host' && room.status === 'active' && (
         <HostActive
           room={room} participants={participants} now={now}
+          onReveal={() => updateRoom(code, { revealed: true })}
           onNext={async () => {
             const next = room.currentQIdx + 1;
             if (next >= room.questions.length) {
-              await updateRoom(code, { status: 'finished', currentQIdx: -1 });
+              await updateRoom(code, { status: 'finished', currentQIdx: -1, revealed: false });
             } else {
-              await updateRoom(code, { currentQIdx: next, questionStartedAt: Date.now() });
+              await updateRoom(code, { currentQIdx: next, questionStartedAt: Date.now(), revealed: false });
             }
           }}
           onExit={exit}
@@ -174,19 +169,19 @@ function Home({ onHost, onJoin }) {
       <div style={styles.heroWrap}>
         <div style={styles.eyebrow}>QUIZ ROOM</div>
         <h1 style={styles.hero}>
-          クリーンアップ・インターナショナル<br />
-          <span style={styles.heroAccent}>夕会クイズ</span>
+          選択式クイズを<br />
+          <span style={styles.heroAccent}>みんなで回答</span>
         </h1>
-        <p style={styles.heroSub}>代表者1名がご入力ください</p>
+        <p style={styles.heroSub}>ホストが進行、全員の画面が連動。</p>
       </div>
       <div style={styles.bigBtns}>
         <button style={{ ...styles.bigBtn, ...styles.bigBtnPrimary }} onClick={onHost}>
-          <span style={styles.bigBtnLabel}>出題者</span>
-          <span style={styles.bigBtnSub}>ホストとして作成</span>
+          <span style={styles.bigBtnLabel}>ホストとして作成</span>
+          <span style={styles.bigBtnSub}>問題を作って進行する</span>
         </button>
         <button style={{ ...styles.bigBtn, ...styles.bigBtnSecondary }} onClick={onJoin}>
-          <span style={styles.bigBtnLabel}>参加者</span>
-          <span style={styles.bigBtnSub}>ルームコードを入力して参加</span>
+          <span style={styles.bigBtnLabel}>参加する</span>
+          <span style={styles.bigBtnSub}>ルームコードを入力</span>
         </button>
       </div>
     </div>
@@ -194,8 +189,7 @@ function Home({ onHost, onJoin }) {
 }
 
 function CreateRoom({ onBack, onCreate }) {
-  const [questions, setQuestions] = useState([{ text: '', options: ['', '', '', ''], correct: null }]);
-  const [timeLimit, setTimeLimit] = useState(20);
+  const [questions, setQuestions] = useState([{ text: '', options: ['', '', '', ''], correct: null, timeLimit: 20 }]);
 
   const update = (i, patch) => {
     const next = [...questions];
@@ -207,7 +201,10 @@ function CreateRoom({ onBack, onCreate }) {
     next[qi].options[oi] = val;
     setQuestions(next);
   };
-  const add = () => setQuestions([...questions, { text: '', options: ['', '', '', ''], correct: null }]);
+  const add = () => {
+    const lastTime = questions[questions.length - 1]?.timeLimit ?? 20;
+    setQuestions([...questions, { text: '', options: ['', '', '', ''], correct: null, timeLimit: lastTime }]);
+  };
   const remove = (i) => setQuestions(questions.filter((_, idx) => idx !== i));
 
   const canSubmit = questions.length > 0 && questions.every((q) =>
@@ -217,21 +214,6 @@ function CreateRoom({ onBack, onCreate }) {
   return (
     <div style={styles.page}>
       <TopBar onBack={onBack} title="問題を作成" />
-
-      <div style={styles.settingCard}>
-        <div style={styles.settingLabel}><Clock size={14} /> 1問あたりの制限時間</div>
-        <div style={styles.timeSettings}>
-          <button style={styles.timeStep} onClick={() => setTimeLimit(Math.max(5, timeLimit - 5))}>−5</button>
-          <input
-            type="number"
-            style={styles.timeInput}
-            value={timeLimit}
-            onChange={(e) => setTimeLimit(Math.max(5, Math.min(300, parseInt(e.target.value) || 20)))}
-          />
-          <span style={styles.timeUnit}>秒</span>
-          <button style={styles.timeStep} onClick={() => setTimeLimit(Math.min(300, timeLimit + 5))}>+5</button>
-        </div>
-      </div>
 
       <div style={styles.qList}>
         {questions.map((q, qi) => (
@@ -244,6 +226,22 @@ function CreateRoom({ onBack, onCreate }) {
                 </button>
               )}
             </div>
+
+            <div style={styles.qTimeRow}>
+              <div style={styles.qTimeLabel}><Clock size={13} /> 制限時間</div>
+              <div style={styles.qTimeCtrl}>
+                <button style={styles.timeStep} onClick={() => update(qi, { timeLimit: Math.max(5, (q.timeLimit ?? 20) - 5) })}>−5</button>
+                <input
+                  type="number"
+                  style={styles.timeInput}
+                  value={q.timeLimit ?? 20}
+                  onChange={(e) => update(qi, { timeLimit: Math.max(5, Math.min(300, parseInt(e.target.value) || 20)) })}
+                />
+                <span style={styles.timeUnit}>秒</span>
+                <button style={styles.timeStep} onClick={() => update(qi, { timeLimit: Math.min(300, (q.timeLimit ?? 20) + 5) })}>+5</button>
+              </div>
+            </div>
+
             <textarea
               style={styles.qInput}
               placeholder="問題文を入力"
@@ -286,7 +284,7 @@ function CreateRoom({ onBack, onCreate }) {
       <button
         style={{ ...styles.primaryBtn, opacity: canSubmit ? 1 : 0.4 }}
         disabled={!canSubmit}
-        onClick={() => onCreate(questions, timeLimit)}
+        onClick={() => onCreate(questions)}
       >
         <Play size={18} /> ルームを作成
       </button>
@@ -311,7 +309,7 @@ function Join({ onBack, onJoin }) {
         />
       </div>
       <div style={styles.formBlock}>
-        <label style={styles.label}>チーム名</label>
+        <label style={styles.label}>あなたの名前</label>
         <input
           style={styles.textInput} placeholder="表示名" maxLength={20}
           value={name} onChange={(e) => setName(e.target.value)}
@@ -331,6 +329,7 @@ function Join({ onBack, onJoin }) {
 function HostWaiting({ code, room, participants, onStart, onExit, toast }) {
   const total = room.questions.length;
   const canStart = participants.length > 0;
+  const totalTime = room.questions.reduce((s, q) => s + qTime(q), 0);
   const copy = () => {
     try { navigator.clipboard.writeText(code); toast('コードをコピーしました'); }
     catch { toast(code); }
@@ -363,8 +362,8 @@ function HostWaiting({ code, room, participants, onStart, onExit, toast }) {
         <div style={styles.statCard}>
           <Clock size={16} style={{ color: '#2fa368' }} />
           <div>
-            <div style={styles.statNum}>{room.timeLimit}s</div>
-            <div style={styles.statLabel}>1問</div>
+            <div style={styles.statNum}>{totalTime}s</div>
+            <div style={styles.statLabel}>合計</div>
           </div>
         </div>
       </div>
@@ -404,14 +403,16 @@ function HostWaiting({ code, room, participants, onStart, onExit, toast }) {
   );
 }
 
-function HostActive({ room, participants, now, onNext, onExit }) {
+function HostActive({ room, participants, now, onReveal, onNext, onExit }) {
   const qIdx = room.currentQIdx;
   const q = room.questions[qIdx];
   const total = room.questions.length;
   const isLast = qIdx === total - 1;
+  const revealed = !!room.revealed;
+  const tl = qTime(q);
 
   const elapsed = (now - (room.questionStartedAt || now)) / 1000;
-  const remaining = Math.max(0, room.timeLimit - elapsed);
+  const remaining = Math.max(0, tl - elapsed);
   const timeUp = remaining <= 0;
 
   const counts = [0, 0, 0, 0];
@@ -422,7 +423,7 @@ function HostActive({ room, participants, now, onNext, onExit }) {
   const answered = counts.reduce((s, c) => s + c, 0);
   const maxCount = Math.max(...counts, 1);
   const allAnswered = answered >= participants.length && participants.length > 0;
-  const canAdvance = timeUp || allAnswered;
+  const canReveal = timeUp || allAnswered;
 
   return (
     <div style={styles.page}>
@@ -442,7 +443,7 @@ function HostActive({ room, participants, now, onNext, onExit }) {
         <div style={styles.timerBar}>
           <div style={{
             ...styles.timerFill,
-            width: `${(remaining / room.timeLimit) * 100}%`,
+            width: `${(remaining / tl) * 100}%`,
             background: timeUp ? '#c0b9a8' : '#e85d2f'
           }} />
         </div>
@@ -453,19 +454,21 @@ function HostActive({ room, participants, now, onNext, onExit }) {
       <div style={styles.liveOpts}>
         {q.options.map((opt, oi) => {
           const c = counts[oi];
-          const isCorrect = timeUp && q.correct === oi;
+          const isCorrect = q.correct === oi;
+          const showCorrect = revealed && isCorrect;
           return (
             <div key={oi} style={{
               ...styles.liveOpt,
-              borderColor: isCorrect ? '#2fa368' : '#e8e2d4',
-              background: isCorrect ? '#eafaf0' : '#fff'
+              borderColor: showCorrect ? '#2fa368' : '#e8e2d4',
+              background: showCorrect ? '#eafaf0' : '#fff'
             }}>
               <div style={styles.liveOptTop}>
                 <span style={{ ...styles.liveMark, color: MARK_COLORS[oi] }}>{MARKS[oi]}</span>
                 <span style={styles.liveText}>{opt}</span>
                 <span style={styles.liveCount}>
                   {c}
-                  {isCorrect && <span style={styles.correctTag}>正解</span>}
+                  {!revealed && isCorrect && <span style={styles.correctTagSoft}>正解</span>}
+                  {showCorrect && <span style={styles.correctTag}>正解</span>}
                 </span>
               </div>
               <div style={styles.barTrack}>
@@ -480,14 +483,26 @@ function HostActive({ room, participants, now, onNext, onExit }) {
         })}
       </div>
 
-      <button
-        style={{ ...styles.primaryBtn, opacity: canAdvance ? 1 : 0.4 }}
-        disabled={!canAdvance}
-        onClick={onNext}
-      >
-        {isLast ? <><Trophy size={18} /> 結果発表</> : <><ChevronRight size={18} /> 次の問題へ</>}
-      </button>
-      {!canAdvance && <div style={styles.hintCenter}>時間終了または全員回答で進めます</div>}
+      {!revealed ? (
+        <>
+          <button
+            style={{ ...styles.primaryBtn, opacity: canReveal ? 1 : 0.4 }}
+            disabled={!canReveal}
+            onClick={onReveal}
+          >
+            <Eye size={18} /> 答えを表示
+          </button>
+          {!canReveal && <div style={styles.hintCenter}>時間終了または全員回答で表示できます</div>}
+          {canReveal && <div style={styles.hintCenter}>準備ができたら参加者に答えを表示します</div>}
+        </>
+      ) : (
+        <>
+          <button style={styles.primaryBtn} onClick={onNext}>
+            {isLast ? <><Trophy size={18} /> 結果発表</> : <><ChevronRight size={18} /> 次の問題へ</>}
+          </button>
+          <div style={styles.hintCenter}>参加者の画面に正解が表示されています</div>
+        </>
+      )}
 
       <button style={styles.exitBtn} onClick={onExit}>
         <X size={14} /> 終了
@@ -511,8 +526,6 @@ function ParticipantWait({ name, room, count, onExit }) {
         <div style={styles.waitMetaRow}>
           <span>{room.questions.length} 問</span>
           <span>·</span>
-          <span>1問 {room.timeLimit} 秒</span>
-          <span>·</span>
           <span>{count} 人</span>
         </div>
       </div>
@@ -524,9 +537,11 @@ function ParticipantAnswer({ room, myAnswers, now, onPick, onExit }) {
   const qIdx = room.currentQIdx;
   const q = room.questions[qIdx];
   const total = room.questions.length;
+  const revealed = !!room.revealed;
+  const tl = qTime(q);
 
   const elapsed = (now - (room.questionStartedAt || now)) / 1000;
-  const remaining = Math.max(0, room.timeLimit - elapsed);
+  const remaining = Math.max(0, tl - elapsed);
   const timeUp = remaining <= 0;
 
   const myChoice = myAnswers[qIdx];
@@ -544,7 +559,7 @@ function ParticipantAnswer({ room, myAnswers, now, onPick, onExit }) {
       <div style={styles.timerBar}>
         <div style={{
           ...styles.timerFill,
-          width: `${(remaining / room.timeLimit) * 100}%`,
+          width: `${(remaining / tl) * 100}%`,
           background: timeUp ? '#c0b9a8' : '#e85d2f'
         }} />
       </div>
@@ -554,8 +569,8 @@ function ParticipantAnswer({ room, myAnswers, now, onPick, onExit }) {
       <div style={styles.answerOpts}>
         {q.options.map((opt, oi) => {
           const isSelected = myChoice === oi;
-          const isCorrect = timeUp && q.correct === oi;
-          const isWrong = timeUp && isSelected && q.correct !== null && q.correct !== oi;
+          const isCorrect = revealed && q.correct === oi;
+          const isWrong = revealed && isSelected && q.correct !== null && q.correct !== oi;
 
           let border = '#e8e2d4', bg = '#fff', color = '#1a2332';
           if (isCorrect) { border = '#2fa368'; bg = '#eafaf0'; }
@@ -584,22 +599,30 @@ function ParticipantAnswer({ room, myAnswers, now, onPick, onExit }) {
         })}
       </div>
 
-      {hasAnswered && !timeUp && (
+      {hasAnswered && !timeUp && !revealed && (
         <div style={{ ...styles.statusBanner, background: '#eafaf0', color: '#2fa368' }}>
           <Check size={16} /> 回答を送信しました
         </div>
       )}
-      {timeUp && !hasAnswered && (
+      {timeUp && !hasAnswered && !revealed && (
         <div style={{ ...styles.statusBanner, background: '#ffe9df', color: '#e85d2f' }}>
           時間切れでした
         </div>
       )}
-      {timeUp && q.correct !== null && (
+      {locked && !revealed && (
+        <div style={styles.hintCenter}>ホストが答えを表示するのを待っています…</div>
+      )}
+      {revealed && q.correct !== null && (
         <div style={{ ...styles.statusBanner, background: '#fffbe8', color: '#a88500' }}>
           正解は <strong style={{ fontSize: 18 }}>{MARKS[q.correct]}</strong>
         </div>
       )}
-      {timeUp && (
+      {revealed && q.correct === null && (
+        <div style={{ ...styles.statusBanner, background: '#f0ebe2', color: '#6a6558' }}>
+          回答終了
+        </div>
+      )}
+      {revealed && (
         <div style={styles.hintCenter}>ホストが次へ進めるのを待っています…</div>
       )}
     </div>
@@ -619,16 +642,16 @@ function ParticipantDone({ room, myAnswers, name, onExit }) {
           <Trophy size={32} strokeWidth={2.5} />
         </div>
         <h2 style={styles.doneTitle}>クイズ終了!</h2>
-        <p style={styles.doneSub}>{name} チーム、お疲れさまでした</p>
+        <p style={styles.doneSub}>{name} さん、お疲れさまでした</p>
         {scored && (
           <div style={styles.scoreCard}>
-            <div style={styles.scoreLabel}>チームのスコア</div>
+            <div style={styles.scoreLabel}>あなたのスコア</div>
             <div style={styles.scoreBig}>{score}<span style={styles.scoreTotal}> / {total}</span></div>
           </div>
         )}
       </div>
 
-      <div style={styles.sectionTitle}>チームの回答</div>
+      <div style={styles.sectionTitle}>あなたの回答</div>
       <div style={styles.myAnsList}>
         {room.questions.map((q, qi) => {
           const a = myAnswers[qi];
@@ -825,12 +848,12 @@ const styles = {
   topBar: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 },
   backBtn: { width: 36, height: 36, borderRadius: 12, border: '1.5px solid #e8e2d4', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a2332' },
   topTitle: { flex: 1, fontSize: 16, fontWeight: 700, textAlign: 'center' },
-  settingCard: { background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1.5px solid #efe9db', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  settingLabel: { fontSize: 13, fontWeight: 700, color: '#6a6558', display: 'flex', alignItems: 'center', gap: 6 },
-  timeSettings: { display: 'flex', alignItems: 'center', gap: 6 },
-  timeStep: { width: 32, height: 32, borderRadius: 8, border: '1.5px solid #e8e2d4', background: '#faf6f0', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#1a2332' },
-  timeInput: { width: 56, textAlign: 'center', border: '1.5px solid #e8e2d4', borderRadius: 8, padding: '6px 4px', fontSize: 16, fontWeight: 700, outline: 'none', background: '#faf6f0' },
-  timeUnit: { fontSize: 12, color: '#9a9385' },
+  qTimeRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#faf6f0', borderRadius: 10, marginBottom: 10 },
+  qTimeLabel: { fontSize: 12, fontWeight: 700, color: '#6a6558', display: 'flex', alignItems: 'center', gap: 5 },
+  qTimeCtrl: { display: 'flex', alignItems: 'center', gap: 5 },
+  timeStep: { width: 28, height: 28, borderRadius: 7, border: '1.5px solid #e8e2d4', background: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#1a2332' },
+  timeInput: { width: 48, textAlign: 'center', border: '1.5px solid #e8e2d4', borderRadius: 7, padding: '4px 2px', fontSize: 14, fontWeight: 700, outline: 'none', background: '#fff' },
+  timeUnit: { fontSize: 11, color: '#9a9385' },
   qList: { display: 'flex', flexDirection: 'column', gap: 12 },
   qCard: { background: '#fff', borderRadius: 16, padding: 16, border: '1.5px solid #efe9db' },
   qHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
@@ -926,6 +949,7 @@ const styles = {
   barTrack: { height: 8, background: '#f0ebe2', borderRadius: 10, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 10, transition: 'width 0.5s ease' },
   correctTag: { fontSize: 10, background: '#2fa368', color: '#fff', padding: '2px 6px', borderRadius: 10, marginLeft: 6, fontWeight: 700 },
+  correctTagSoft: { fontSize: 10, background: '#f0ebe2', color: '#6a6558', padding: '2px 6px', borderRadius: 10, marginLeft: 6, fontWeight: 700, border: '1px dashed #c0b9a8' },
   rankRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f0ebe2' },
   rankPos: { width: 28, height: 28, borderRadius: 10, background: '#faf6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, fontFamily: "'DotGothic16', monospace" },
   rankName: { flex: 1, fontWeight: 600 },
